@@ -12,12 +12,19 @@ import requests
 app = Flask(__name__)
 app.secret_key = "sanjay_bank_flask_secret_1204"  # change if you like
 
+import os
+
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "sanjay1231",  # set by you
-    "database": "sanjay_bank"
+    "host": os.environ.get("DB_HOST"),
+    "user": os.environ.get("DB_USER"),
+    "password": os.environ.get("DB_PASS"),
+    "database": os.environ.get("DB_NAME"),
+    "port": int(os.environ.get("DB_PORT")),
+    "ssl_disabled": False
 }
+
+print("🔍 Current DB Config Loaded:")
+print(DB_CONFIG)
 
 SECRETS_FILE = "fast2sms_key.txt"
 FAST2SMS_ENDPOINT = "https://www.fast2sms.com/dev/bulkV2"
@@ -430,6 +437,7 @@ def forgot():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
 
