@@ -198,6 +198,60 @@ def register():
     return render_template("register.html")
 
 
+from flask import render_template, request, redirect, url_for, flash, session
+
+@app.route("/change_pin", methods=["GET", "POST"])
+def change_pin():
+    # User must be logged in
+    acc_no = session.get("acc_no")
+    if not acc_no:
+        flash("Please login first.", "warning")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        new_pin = (request.form.get("new_pin") or "").strip()
+        confirm_pin = (request.form.get("confirm_pin") or "").strip()
+
+        # Basic validations
+        if not (new_pin.isdigit() and len(new_pin) == 4):
+            flash("PIN must be exactly 4 digits.", "danger")
+            return render_template("change_pin.html")
+
+        if new_pin != confirm_pin:
+            flash("PINs do not match.", "danger")
+            return render_template("change_pin.html")
+
+        # Update DB
+        conn = get_db()
+        cur = conn.cursor()
+        try:
+            cur.execute("UPDATE accounts SET pin=%s WHERE account_number=%s", (new_pin, acc_no))
+            # log transaction
+            cur.execute(
+                "INSERT INTO transactions (account_number, txn_type, amount, note) VALUES (%s,'PIN_CHANGE',0,%s)",
+                (acc_no, "PIN changed via web"),
+            )
+            # sms notify
+            cur.execute("SELECT phone FROM accounts WHERE account_number=%s", (acc_no,))
+            row = cur.fetchone()
+            phone = row[0] if row else None
+
+            conn.commit()
+            if phone:
+                send_sms(phone, f"Sanjay Bank: Your ATM PIN for A/c {acc_no} has been changed.")
+            flash("PIN updated successfully.", "success")
+            return redirect(url_for("dashboard"))
+        except Exception as e:
+            conn.rollback()
+            flash(f"Failed to update PIN: {e}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+
+    # GET
+    return render_template("change_pin.html")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     # L3: Login by (Account Number + PIN) OR (Phone + PIN)

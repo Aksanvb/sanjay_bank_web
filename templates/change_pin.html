@@ -1,10 +1,24 @@
-html
 {% extends "base.html" %}
 {% block content %}
-<h2 class="mb-4">Change PIN</h2>
-<form method="post" class="card p-4 shadow-sm">
-  <label class="form-label">New PIN (4 digits)</label>
-  <input name="new_pin" class="form-control" maxlength="4" minlength="4" required>
-  <button class="btn btn-primary mt-3">Update PIN</button>
-</form>
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="mb-3">Change PIN</h3>
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">New PIN (4 digits)</label>
+            <input type="password" name="new_pin" maxlength="4" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Confirm PIN</label>
+            <input type="password" name="confirm_pin" maxlength="4" class="form-control" required>
+          </div>
+          <button class="btn btn-primary" type="submit">Update PIN</button>
+          <a class="btn btn-outline-secondary ms-2" href="{{ url_for('dashboard') }}">Cancel</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
