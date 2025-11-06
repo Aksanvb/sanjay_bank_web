@@ -1,0 +1,20 @@
+html
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Forgot Account Number</h2>
+<form method="post" class="card p-4 shadow-sm">
+  <div class="mb-3">
+    <label class="form-label">Choose a method</label>
+    <select name="method" class="form-select">
+      <option value="phone">Phone</option>
+      <option value="aadhar">Aadhaar</option>
+      <option value="pan">PAN</option>
+    </select>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Enter value</label>
+    <input name="value" class="form-control" required>
+  </div>
+  <button class="btn btn-primary">Find Account Number</button>
+</form>
+{% endblock %}

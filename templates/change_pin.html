@@ -1,0 +1,10 @@
+html
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Change PIN</h2>
+<form method="post" class="card p-4 shadow-sm">
+  <label class="form-label">New PIN (4 digits)</label>
+  <input name="new_pin" class="form-control" maxlength="4" minlength="4" required>
+  <button class="btn btn-primary mt-3">Update PIN</button>
+</form>
+{% endblock %}

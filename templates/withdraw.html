@@ -1,0 +1,10 @@
+html
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Withdraw</h2>
+<form method="post" class="card p-4 shadow-sm">
+  <label class="form-label">Amount (₹)</label>
+  <input name="amount" class="form-control" required>
+  <button class="btn btn-primary mt-3">Withdraw</button>
+</form>
+{% endblock %}

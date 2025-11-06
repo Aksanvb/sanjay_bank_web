@@ -1,0 +1,19 @@
+css
+/* Theme 2: Modern gradient blue/red vibe */
+:root{
+  --primary:#0d6efd;
+  --accent:#e63946;
+}
+.bg-gradient-royal{
+  background: linear-gradient(90deg, #0d47a1, #1e88e5);
+}
+.text-gradient{
+  background: linear-gradient(90deg, #1e88e5, #e63946);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-card{
+  background: radial-gradient(1000px 200px at top left, rgba(13,110,253,.15), transparent),
+              radial-gradient(800px 200px at bottom right, rgba(230,57,70,.15), transparent),
+              #fff;
+}

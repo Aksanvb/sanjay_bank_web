@@ -1,0 +1,40 @@
+html
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Open New Account</h2>
+<form method="post" class="card p-4 shadow-sm">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Full Name</label>
+      <input name="name" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">DOB</label>
+      <input type="date" name="dob" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Phone</label>
+      <input name="phone" class="form-control" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Aadhaar</label>
+      <input name="aadhar" class="form-control" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">PAN</label>
+      <input name="pan" class="form-control" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">PIN (4 digits)</label>
+      <input name="pin" class="form-control" maxlength="4" minlength="4" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Initial Deposit (₹)</label>
+      <input name="initial_deposit" class="form-control" required>
+    </div>
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-primary">Create Account</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,22 @@
+html
+{% extends "base.html" %}
+{% block content %}
+<div class="row align-items-center">
+  <div class="col-md-6">
+    <h1 class="display-5 fw-bold">Welcome to <span class="text-gradient">Sanjay Bank</span></h1>
+    <p class="lead">Modern banking made simple. Open an account, deposit, transfer, and manage your money online.</p>
+    <a class="btn btn-primary btn-lg me-2" href="{{ url_for('register') }}">Open Account</a>
+    <a class="btn btn-outline-primary btn-lg" href="{{ url_for('login') }}">Login</a>
+  </div>
+  <div class="col-md-6 text-center">
+    <div class="hero-card shadow-lg p-5 rounded-4">
+      <h3 class="mb-3">Secure • Fast • Simple</h3>
+      <ul class="list-unstyled">
+        <li>✔ Online transfers</li>
+        <li>✔ PIN-based security</li>
+        <li>✔ SMS notifications</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
