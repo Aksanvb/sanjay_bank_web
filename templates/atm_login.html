@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container text-center mt-5">
+  <h2>ATM Login</h2>
+  <form method="POST" class="mt-4" style="max-width: 320px; margin:auto;">
+    <input type="password" class="form-control mb-3" name="pin" placeholder="Enter PIN" required>
+    <button class="btn btn-primary w-100">Enter</button>
+  </form>
+</div>
+{% endblock %}

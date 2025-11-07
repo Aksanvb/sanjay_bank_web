@@ -489,6 +489,125 @@ def forgot():
 
     return render_template("forgot.html")
 
+# ------------------- ATM LOGIN (PIN ONLY) -------------------
+@app.route("/atm", methods=["GET", "POST"])
+def atm_login():
+    if request.method == "POST":
+        pin = request.form["pin"]
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT account_number, balance, phone FROM accounts WHERE pin=%s", (pin,))
+        user = cur.fetchone()
+
+        if user:
+            session["atm_acc"] = user[0]
+            return redirect(url_for("atm_menu"))
+        else:
+            flash("Invalid PIN. Try again.", "danger")
+
+        cur.close()
+        conn.close()
+
+    return render_template("atm_login.html")
+
+
+# ------------------- ATM MENU -------------------
+@app.route("/atm/menu")
+def atm_menu():
+    if "atm_acc" not in session:
+        return redirect(url_for("atm_login"))
+    return render_template("atm_menu.html")
+
+
+# ------------------- ATM WITHDRAW -------------------
+@app.route("/atm/withdraw", methods=["GET", "POST"])
+def atm_withdraw():
+    if "atm_acc" not in session:
+        return redirect(url_for("atm_login"))
+
+    acc = session["atm_acc"]
+    msg = None
+
+    if request.method == "POST":
+        amt = int(request.form["amount"])
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT balance, phone FROM accounts WHERE account_number=%s", (acc,))
+        bal, phone = cur.fetchone()
+
+        if amt <= bal:
+            new_bal = bal - amt
+            cur.execute("UPDATE accounts SET balance=%s WHERE account_number=%s", (new_bal, acc))
+            conn.commit()
+            send_sms(phone, f"Sanjay Bank ATM: ₹{amt} withdrawn. Avl Bal: ₹{new_bal}.")
+            flash("Cash withdrawn successfully!", "success")
+        else:
+            flash("Insufficient Balance!", "danger")
+
+        cur.close()
+        conn.close()
+
+    return render_template("atm_withdraw.html")
+
+
+# ------------------- ATM DEPOSIT -------------------
+@app.route("/atm/deposit", methods=["GET", "POST"])
+def atm_deposit():
+    if "atm_acc" not in session:
+        return redirect(url_for("atm_login"))
+
+    acc = session["atm_acc"]
+
+    if request.method == "POST":
+        amt = int(request.form["amount"])
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("UPDATE accounts SET balance = balance + %s WHERE account_number=%s", (amt, acc))
+        conn.commit()
+
+        cur.execute("SELECT phone, balance FROM accounts WHERE account_number=%s", (acc,))
+        phone, bal = cur.fetchone()
+        send_sms(phone, f"Sanjay Bank ATM: ₹{amt} deposited. Avl Bal: ₹{bal}.")
+
+        cur.close()
+        conn.close()
+
+        flash("Amount Deposited Successfully!", "success")
+
+    return render_template("atm_deposit.html")
+
+
+# ------------------- ATM CHECK BALANCE -------------------
+@app.route("/atm/balance")
+def atm_balance():
+    if "atm_acc" not in session:
+        return redirect(url_for("atm_login"))
+
+    acc = session["atm_acc"]
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT balance FROM accounts WHERE account_number=%s", (acc,))
+    balance = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+
+    return render_template("atm_balance.html", balance=balance)
+
+
+# ------------------- ATM LOGOUT -------------------
+@app.route("/atm/logout")
+def atm_logout():
+    session.pop("atm_acc", None)
+    flash("ATM session closed.", "info")
+    return redirect(url_for("atm_login"))
+
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

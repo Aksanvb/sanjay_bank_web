@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container text-center mt-5">
+  <h2>ATM Menu</h2>
+  <a href="{{ url_for('atm_withdraw') }}" class="btn btn-danger w-50 mt-3">Withdraw Cash</a>
+  <a href="{{ url_for('atm_deposit') }}" class="btn btn-success w-50 mt-3">Deposit Cash</a>
+  <a href="{{ url_for('atm_balance') }}" class="btn btn-info w-50 mt-3">Check Balance</a>
+  <a href="{{ url_for('atm_logout') }}" class="btn btn-secondary w-50 mt-3">Exit</a>
+</div>
+{% endblock %}
