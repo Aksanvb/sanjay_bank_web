@@ -85,25 +85,22 @@ def read_fast2sms_key() -> str:
     return ""
 
 
-def send_sms(mobile: str, message: str):
+def send_sms(mobile, message):
     try:
-        api_key = read_fast2sms_key()
-        if not api_key:
-            return
-        headers = {'authorization': api_key}
-        data = {
-            'route': 'v3',
-            'sender_id': 'TXTIND',
-            'message': message,
-            'language': 'english',
-            'flash': 0,
-            'numbers': mobile
+        url = f"https://2factor.in/API/V1/{682fcd54-bde7-11f0-bdde-0200cd936042}/ADDON_SERVICES/SEND/TSMS"
+        
+        payload = {
+            "From": "SANJAY",   # 6 letters ONLY
+            "To": mobile,
+            "Msg": message
         }
-        resp = requests.post(FAST2SMS_ENDPOINT, headers=headers, data=data, timeout=10)
-        if resp.status_code != 200:
-            print(f"(SMS) Non-200 response: {resp.status_code}")
+        
+        response = requests.post(url, data=payload)
+        print("SMS Sent →", response.text, flush=True)
+        
     except Exception as e:
-        print(f"(SMS) Failed to send: {e}")
+        print("SMS Error:", e, flush=True)
+
 
 
 def calc_age(dob: date) -> int:
