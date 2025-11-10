@@ -87,7 +87,7 @@ def read_fast2sms_key() -> str:
 
 def send_sms(mobile, message):
     try:
-        url = f"https://2factor.in/API/V1/{682fcd54-bde7-11f0-bdde-0200cd936042}/ADDON_SERVICES/SEND/TSMS"
+        url = f"https://2factor.in/API/V1/"682fcd54-bde7-11f0-bdde-0200cd936042"/ADDON_SERVICES/SEND/TSMS"
         
         payload = {
             "From": "SANJAY",   # 6 letters ONLY
