@@ -4,15 +4,12 @@ from mysql.connector import Error
 from datetime import datetime, date
 import random
 import os
-import requests
 
 # -----------------------------
 # Config
 # -----------------------------
 app = Flask(__name__)
-app.secret_key = "sanjay_bank_flask_secret_1204"  # change if you like
-
-import os
+app.secret_key = "sanjay_bank_flask_secret_1204"
 
 DB_CONFIG = {
     "host": os.environ.get("DB_HOST"),
@@ -23,12 +20,6 @@ DB_CONFIG = {
     "ssl_disabled": False
 }
 
-print("🔍 Current DB Config Loaded:")
-print(DB_CONFIG)
-
-SECRETS_FILE = "fast2sms_key.txt"
-FAST2SMS_ENDPOINT = "https://www.fast2sms.com/dev/bulkV2"
-
 
 def get_db():
     return mysql.connector.connect(**DB_CONFIG)
@@ -37,8 +28,8 @@ def get_db():
 def init_schema():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
-        """
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             account_number BIGINT PRIMARY KEY,
             name VARCHAR(80) NOT NULL,
@@ -51,10 +42,9 @@ def init_schema():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         );
-        """
-    )
-    cur.execute(
-        """
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             id BIGINT PRIMARY KEY AUTO_INCREMENT,
             account_number BIGINT NOT NULL,
@@ -65,43 +55,11 @@ def init_schema():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_number) REFERENCES accounts(account_number)
         );
-        """
-    )
+    """)
+
     conn.commit()
-    cur.close(); conn.close()
-
-
-def read_fast2sms_key() -> str:
-    if os.path.exists(SECRETS_FILE):
-        try:
-            with open(SECRETS_FILE, "r", encoding="utf-8") as f:
-                k = f.read().strip()
-                if k:
-                    return k
-        except Exception:
-            pass
-    # No key present: show a one-time hint in logs (not to user directly)
-    print("Fast2SMS key missing. Place it in fast2sms_key.txt (same folder as app.py).")
-    return ""
-
-
-def send_sms(mobile, message):
-    try:
-        url = f"https://2factor.in/API/V1/{"682fcd54-bde7-11f0-bdde-0200cd936042"}/ADDON_SERVICES/SEND/TSMS"
-        
-        payload = {
-            "From": "SANJAY",     # 6-letter sender name (UPPERCASE)
-            "To": mobile,
-            "Msg": message
-        }
-        
-        response = requests.post(url, data=payload)
-        print("SMS Response →", response.text)
-
-    except Exception as e:
-        print("SMS Error:", e)
-
-
+    cur.close()
+    conn.close()
 
 
 def calc_age(dob: date) -> int:
@@ -117,8 +75,8 @@ def generate_account_number(cur) -> int:
             return acc
 
 
-# Ensure DB tables only initialize once
 initialized = False
+
 
 @app.before_request
 def before_first_request():
@@ -126,7 +84,6 @@ def before_first_request():
     if not initialized:
         init_schema()
         initialized = True
-
 
 
 @app.route("/")
@@ -142,12 +99,12 @@ def explore():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        name = request.form.get("name","").strip()
-        dob_str = request.form.get("dob","").strip()
-        phone = request.form.get("phone","").strip()
-        aadhar = request.form.get("aadhar","").strip()
-        pan = request.form.get("pan","").strip().upper()
-        pin = request.form.get("pin","").strip()
+        name = request.form.get("name").strip()
+        dob_str = request.form.get("dob").strip()
+        phone = request.form.get("phone").strip()
+        aadhar = request.form.get("aadhar").strip()
+        pan = request.form.get("pan").strip().upper()
+        pin = request.form.get("pin").strip()
 
         try:
             dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
@@ -156,7 +113,7 @@ def register():
             return redirect(url_for("register"))
 
         if calc_age(dob) < 18:
-            flash("Only users 18+ can create an account.", "danger")
+            flash("Only users 18+ can open an account.", "danger")
             return redirect(url_for("register"))
 
         if not (pin.isdigit() and len(pin) == 4):
@@ -164,130 +121,67 @@ def register():
             return redirect(url_for("register"))
 
         try:
-            init_amt = float(request.form.get("initial_deposit","0"))
+            init_amt = float(request.form.get("initial_deposit"))
             if init_amt < 1000:
                 flash("Minimum initial deposit is ₹1000.", "danger")
                 return redirect(url_for("register"))
-        except ValueError:
-            flash("Invalid initial deposit.", "danger")
+        except:
+            flash("Invalid deposit amount.", "danger")
             return redirect(url_for("register"))
 
-        conn = get_db(); cur = conn.cursor()
+        conn = get_db()
+        cur = conn.cursor()
         try:
             acc_no = generate_account_number(cur)
+
             cur.execute("""
                 INSERT INTO accounts (account_number, name, dob, phone, aadhar, pan, pin, balance)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
             """, (acc_no, name, dob, phone, aadhar, pan, pin, init_amt))
+
             cur.execute("""
-                INSERT INTO transactions (account_number, txn_type, amount, note)
+                INSERT INTO transactions(account_number, txn_type, amount, note)
                 VALUES (%s,'ACCOUNT_CREATE',%s,%s)
-            """, (acc_no, init_amt, "Initial deposit on account creation"))
+            """, (acc_no, init_amt, "Initial deposit"))
+
             conn.commit()
             flash(f"Account created! Your Account Number is {acc_no}", "success")
-            send_sms(phone, f"Sanjay Bank: Account {acc_no} created. Opening balance ₹{init_amt:.2f}.")
             return redirect(url_for("login"))
         except Error as e:
             conn.rollback()
-            flash(f"Failed to create account: {e}", "danger")
-        finally:
-            cur.close(); conn.close()
-
-    return render_template("register.html")
-
-
-from flask import render_template, request, redirect, url_for, flash, session
-
-@app.route("/change_pin", methods=["GET", "POST"])
-def change_pin():
-    # User must be logged in
-    acc_no = session.get("acc_no")
-    if not acc_no:
-        flash("Please login first.", "warning")
-        return redirect(url_for("login"))
-
-    if request.method == "POST":
-        new_pin = (request.form.get("new_pin") or "").strip()
-        confirm_pin = (request.form.get("confirm_pin") or "").strip()
-
-        # Basic validations
-        if not (new_pin.isdigit() and len(new_pin) == 4):
-            flash("PIN must be exactly 4 digits.", "danger")
-            return render_template("change_pin.html")
-
-        if new_pin != confirm_pin:
-            flash("PINs do not match.", "danger")
-            return render_template("change_pin.html")
-
-        # Update DB
-        conn = get_db()
-        cur = conn.cursor()
-        try:
-            cur.execute("UPDATE accounts SET pin=%s WHERE account_number=%s", (new_pin, acc_no))
-            # log transaction
-            cur.execute(
-                "INSERT INTO transactions (account_number, txn_type, amount, note) VALUES (%s,'PIN_CHANGE',0,%s)",
-                (acc_no, "PIN changed via web"),
-            )
-            # sms notify
-            cur.execute("SELECT phone FROM accounts WHERE account_number=%s", (acc_no,))
-            row = cur.fetchone()
-            phone = row[0] if row else None
-
-            conn.commit()
-            if phone:
-                send_sms(phone, f"Sanjay Bank: Your ATM PIN for A/c {acc_no} has been changed.")
-            flash("PIN updated successfully.", "success")
-            return redirect(url_for("dashboard"))
-        except Exception as e:
-            conn.rollback()
-            flash(f"Failed to update PIN: {e}", "danger")
+            flash(f"Error: {e}", "danger")
         finally:
             cur.close()
             conn.close()
 
-    # GET
-    return render_template("change_pin.html")
+    return render_template("register.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # L3: Login by (Account Number + PIN) OR (Phone + PIN)
     if request.method == "POST":
-        id_value = request.form.get("id_value","").strip()
-        pin = request.form.get("pin","").strip()
+        id_value = request.form.get("id_value").strip()
+        pin = request.form.get("pin").strip()
+
         if not (pin.isdigit() and len(pin) == 4):
             flash("PIN must be 4 digits.", "danger")
             return redirect(url_for("login"))
 
-        conn = get_db(); cur = conn.cursor()
-        try:
-            # Try account number
-            acc_no = None
-            if id_value.isdigit() and len(id_value) >= 6:
-                cur.execute("SELECT account_number, phone FROM accounts WHERE account_number=%s AND pin=%s",
-                            (int(id_value), pin))
-                row = cur.fetchone()
-                if row:
-                    acc_no = row[0]
+        conn = get_db()
+        cur = conn.cursor()
 
-            if acc_no is None:
-                # Try phone
-                cur.execute("SELECT account_number, phone FROM accounts WHERE phone=%s AND pin=%s",
-                            (id_value, pin))
-                row = cur.fetchone()
-                if row:
-                    acc_no = row[0]
+        cur.execute("SELECT account_number FROM accounts WHERE (account_number=%s OR phone=%s) AND pin=%s",
+                    (id_value, id_value, pin))
+        row = cur.fetchone()
 
-            if acc_no is None:
-                flash("Invalid credentials.", "danger")
-                return redirect(url_for("login"))
+        cur.close()
+        conn.close()
 
-            session["acc_no"] = acc_no
-            flash("Login successful!", "success")
+        if row:
+            session["acc_no"] = row[0]
             return redirect(url_for("dashboard"))
-        finally:
-            cur.close(); conn.close()
+        else:
+            flash("Invalid Login.", "danger")
 
     return render_template("login.html")
 
@@ -295,223 +189,147 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("Logged out.", "info")
     return redirect(url_for("home"))
-
-
-def require_login():
-    if "acc_no" not in session:
-        flash("Please login first.", "warning")
-        return False
-    return True
 
 
 @app.route("/dashboard")
 def dashboard():
-    if not require_login():
+    if "acc_no" not in session:
         return redirect(url_for("login"))
+
     acc_no = session["acc_no"]
-    conn = get_db(); cur = conn.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("SELECT name, balance FROM accounts WHERE account_number=%s", (acc_no,))
-    row = cur.fetchone()
-    cur.close(); conn.close()
-    name, balance = row if row else ("User", 0.0)
+    name, balance = cur.fetchone()
+    cur.close()
+    conn.close()
+
     return render_template("dashboard.html", name=name, balance=balance, acc_no=acc_no)
 
 
-@app.route("/deposit", methods=["GET","POST"])
+@app.route("/deposit", methods=["GET", "POST"])
 def deposit():
-    if not require_login():
+    if "acc_no" not in session:
         return redirect(url_for("login"))
+
     acc_no = session["acc_no"]
+
     if request.method == "POST":
-        try:
-            amt = float(request.form.get("amount","0"))
-        except ValueError:
-            flash("Invalid amount.", "danger")
-            return redirect(url_for("deposit"))
+        amt = float(request.form.get("amount"))
         if amt <= 0:
             flash("Amount must be positive.", "danger")
             return redirect(url_for("deposit"))
-        conn = get_db(); cur = conn.cursor()
-        try:
-            cur.execute("UPDATE accounts SET balance = balance + %s WHERE account_number=%s", (amt, acc_no))
-            cur.execute("INSERT INTO transactions (account_number, txn_type, amount, note) VALUES (%s,'DEPOSIT',%s,%s)",
-                        (acc_no, amt, "Online deposit"))
-            cur.execute("SELECT phone FROM accounts WHERE account_number=%s", (acc_no,))
-            phone = cur.fetchone()[0]
-            conn.commit()
-            flash("Deposit successful!", "success")
-            send_sms(phone, f"Sanjay Bank: ₹{amt:.2f} deposited. A/c {acc_no}.")
-            return redirect(url_for("dashboard"))
-        except Error as e:
-            conn.rollback(); flash(f"Deposit failed: {e}", "danger")
-        finally:
-            cur.close(); conn.close()
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE accounts SET balance = balance + %s WHERE account_number=%s", (amt, acc_no))
+        cur.execute("INSERT INTO transactions VALUES (NULL,%s,'DEPOSIT',%s,'Online deposit',NULL)", (acc_no, amt))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash("Deposit successful!", "success")
+        return redirect(url_for("dashboard"))
+
     return render_template("deposit.html")
 
 
-@app.route("/withdraw", methods=["GET","POST"])
+@app.route("/withdraw", methods=["GET", "POST"])
 def withdraw():
-    if not require_login():
+    if "acc_no" not in session:
         return redirect(url_for("login"))
+
     acc_no = session["acc_no"]
+
     if request.method == "POST":
-        try:
-            amt = float(request.form.get("amount","0"))
-        except ValueError:
-            flash("Invalid amount.", "danger")
-            return redirect(url_for("withdraw"))
-        if amt <= 0:
-            flash("Amount must be positive.", "danger")
-            return redirect(url_for("withdraw"))
-        conn = get_db(); cur = conn.cursor()
-        try:
-            conn.start_transaction()
-            cur.execute("SELECT balance, phone FROM accounts WHERE account_number=%s FOR UPDATE", (acc_no,))
-            row = cur.fetchone()
-            if not row:
-                raise ValueError("Account not found")
-            bal, phone = row
-            if bal < amt:
-                raise ValueError("Insufficient balance")
-            cur.execute("UPDATE accounts SET balance = balance - %s WHERE account_number=%s", (amt, acc_no))
-            cur.execute("INSERT INTO transactions (account_number, txn_type, amount, note) VALUES (%s,'WITHDRAW',%s,%s)",
-                        (acc_no, amt, "Online withdrawal"))
+        amt = float(request.form.get("amount"))
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT balance FROM accounts WHERE account_number=%s", (acc_no,))
+        bal = cur.fetchone()[0]
+
+        if amt > bal:
+            flash("Insufficient balance.", "danger")
+        else:
+            new_bal = bal - amt
+            cur.execute("UPDATE accounts SET balance=%s WHERE account_number=%s", (new_bal, acc_no))
+            cur.execute("INSERT INTO transactions VALUES (NULL,%s,'WITHDRAW',%s,'Online withdrawal',NULL)",
+                        (acc_no, amt))
             conn.commit()
             flash("Withdrawal successful!", "success")
-            send_sms(phone, f"Sanjay Bank: ₹{amt:.2f} withdrawn. A/c {acc_no}.")
-            return redirect(url_for("dashboard"))
-        except Exception as e:
-            conn.rollback(); flash(f"Withdrawal failed: {e}", "danger")
-        finally:
-            cur.close(); conn.close()
+
+        cur.close()
+        conn.close()
+        return redirect(url_for("dashboard"))
+
     return render_template("withdraw.html")
 
 
-@app.route("/transfer", methods=["GET","POST"])
+@app.route("/transfer", methods=["GET", "POST"])
 def transfer():
-    if not require_login():
+    if "acc_no" not in session:
         return redirect(url_for("login"))
+
     acc_no = session["acc_no"]
 
     if request.method == "POST":
-        try:
-            to_acc = int(request.form.get("to_acc", "0"))
-            amt = float(request.form.get("amount", "0"))
-        except ValueError:
-            flash("Invalid account number or amount.", "danger")
-            return redirect(url_for("transfer"))
-
-        if to_acc == acc_no:
-            flash("Cannot transfer to your own account.", "warning")
-            return redirect(url_for("transfer"))
-
-        if amt <= 0:
-            flash("Amount must be positive.", "danger")
-            return redirect(url_for("transfer"))
+        to_acc = int(request.form.get("to_acc"))
+        amt = float(request.form.get("amount"))
 
         conn = get_db()
         cur = conn.cursor()
 
-        try:
-            conn.start_transaction()
+        cur.execute("SELECT balance FROM accounts WHERE account_number=%s", (acc_no,))
+        bal = cur.fetchone()[0]
 
-            # Lock source account
-            cur.execute("SELECT balance, phone FROM accounts WHERE account_number=%s FOR UPDATE", (acc_no,))
-            src = cur.fetchone()
-            if not src:
-                raise ValueError("Source account not found")
-            src_bal, src_phone = src
-
-            if src_bal < amt:
-                raise ValueError("Insufficient balance")
-
-            # Lock destination account
-            cur.execute("SELECT phone FROM accounts WHERE account_number=%s FOR UPDATE", (to_acc,))
-            dst = cur.fetchone()
-            if not dst:
-                raise ValueError("Destination account not found")
-            dst_phone = dst[0]
-
-            # Perform transfer
+        if amt > bal:
+            flash("Insufficient balance.", "danger")
+        else:
             cur.execute("UPDATE accounts SET balance = balance - %s WHERE account_number=%s", (amt, acc_no))
             cur.execute("UPDATE accounts SET balance = balance + %s WHERE account_number=%s", (amt, to_acc))
 
-            # Record logs
-            cur.execute("""
-                INSERT INTO transactions (account_number, txn_type, amount, note, counterparty)
-                VALUES (%s,'TRANSFER_OUT',%s,%s,%s)
-            """, (acc_no, amt, "Online transfer to another account", to_acc))
+            cur.execute("""INSERT INTO transactions VALUES (NULL,%s,'TRANSFER_OUT',%s,'Transfer to %s',%s)""",
+                        (acc_no, amt, to_acc, to_acc))
 
-            cur.execute("""
-                INSERT INTO transactions (account_number, txn_type, amount, note, counterparty)
-                VALUES (%s,'TRANSFER_IN',%s,%s,%s)
-            """, (to_acc, amt, "Online transfer received", acc_no))
+            cur.execute("""INSERT INTO transactions VALUES (NULL,%s,'TRANSFER_IN',%s,'Received from %s',%s)""",
+                        (to_acc, amt, acc_no, acc_no))
 
             conn.commit()
-            flash("✅ Transfer successful!", "success")
+            flash("Transfer successful!", "success")
 
-            # SMS Alerts
-            send_sms(src_phone, f"Sanjay Bank: ₹{amt:.2f} sent to {to_acc}. A/c {acc_no}.")
-            send_sms(dst_phone, f"Sanjay Bank: ₹{amt:.2f} received from {acc_no}. A/c {to_acc}.")
-
-            return redirect(url_for("dashboard"))
-
-        except Exception as e:
-            conn.rollback()
-            flash(f"❌ Transfer failed: {e}", "danger")
-        finally:
-            cur.close()
-            conn.close()
+        cur.close()
+        conn.close()
+        return redirect(url_for("dashboard"))
 
     return render_template("transfer.html")
 
-@app.route("/forgot", methods=["GET", "POST"])
-def forgot():
+
+# ATM Login
+@app.route("/atm", methods=["GET", "POST"])
+def atm_login():
     if request.method == "POST":
-        phone = request.form.get("phone")
+        pin = request.form.get("pin").strip()
 
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT account_number FROM accounts WHERE phone=%s", (phone,))
+
+        cur.execute("SELECT account_number FROM accounts WHERE pin=%s", (pin,))
         row = cur.fetchone()
+
         cur.close()
         conn.close()
 
         if row:
-            acc = row[0]
-            flash(f"✅ Your Account Number is: {acc}", "success")
-        else:
-            flash("❌ No account found with this phone number.", "danger")
-
-    return render_template("forgot.html")
-
-# ------------------- ATM LOGIN (PIN ONLY) -------------------
-@app.route("/atm", methods=["GET", "POST"])
-def atm_login():
-    if request.method == "POST":
-        pin = request.form["pin"]
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("SELECT account_number, balance, phone FROM accounts WHERE pin=%s", (pin,))
-        user = cur.fetchone()
-
-        if user:
-            session["atm_acc"] = user[0]
+            session["atm_acc"] = row[0]
             return redirect(url_for("atm_menu"))
         else:
-            flash("Invalid PIN. Try again.", "danger")
-
-        cur.close()
-        conn.close()
+            flash("Invalid PIN.", "danger")
 
     return render_template("atm_login.html")
 
 
-# ------------------- ATM MENU -------------------
 @app.route("/atm/menu")
 def atm_menu():
     if "atm_acc" not in session:
@@ -519,32 +337,26 @@ def atm_menu():
     return render_template("atm_menu.html")
 
 
-# ------------------- ATM WITHDRAW -------------------
 @app.route("/atm/withdraw", methods=["GET", "POST"])
 def atm_withdraw():
     if "atm_acc" not in session:
         return redirect(url_for("atm_login"))
-
     acc = session["atm_acc"]
-    msg = None
 
     if request.method == "POST":
-        amt = int(request.form["amount"])
+        amt = float(request.form.get("amount"))
 
         conn = get_db()
         cur = conn.cursor()
-
-        cur.execute("SELECT balance, phone FROM accounts WHERE account_number=%s", (acc,))
-        bal, phone = cur.fetchone()
+        cur.execute("SELECT balance FROM accounts WHERE account_number=%s", (acc,))
+        bal = cur.fetchone()[0]
 
         if amt <= bal:
-            new_bal = bal - amt
-            cur.execute("UPDATE accounts SET balance=%s WHERE account_number=%s", (new_bal, acc))
+            cur.execute("UPDATE accounts SET balance=%s WHERE account_number=%s", (bal - amt, acc))
             conn.commit()
-            send_sms(phone, f"Sanjay Bank ATM: ₹{amt} withdrawn. Avl Bal: ₹{new_bal}.")
-            flash("Cash withdrawn successfully!", "success")
+            flash("Cash withdrawn!", "success")
         else:
-            flash("Insufficient Balance!", "danger")
+            flash("Insufficient balance!", "danger")
 
         cur.close()
         conn.close()
@@ -552,36 +364,25 @@ def atm_withdraw():
     return render_template("atm_withdraw.html")
 
 
-# ------------------- ATM DEPOSIT -------------------
 @app.route("/atm/deposit", methods=["GET", "POST"])
 def atm_deposit():
     if "atm_acc" not in session:
         return redirect(url_for("atm_login"))
-
     acc = session["atm_acc"]
 
     if request.method == "POST":
-        amt = int(request.form["amount"])
-
+        amt = float(request.form.get("amount"))
         conn = get_db()
         cur = conn.cursor()
-
         cur.execute("UPDATE accounts SET balance = balance + %s WHERE account_number=%s", (amt, acc))
         conn.commit()
-
-        cur.execute("SELECT phone, balance FROM accounts WHERE account_number=%s", (acc,))
-        phone, bal = cur.fetchone()
-        send_sms(phone, f"Sanjay Bank ATM: ₹{amt} deposited. Avl Bal: ₹{bal}.")
-
         cur.close()
         conn.close()
-
-        flash("Amount Deposited Successfully!", "success")
+        flash("Deposit successful!", "success")
 
     return render_template("atm_deposit.html")
 
 
-# ------------------- ATM CHECK BALANCE -------------------
 @app.route("/atm/balance")
 def atm_balance():
     if "atm_acc" not in session:
@@ -591,24 +392,67 @@ def atm_balance():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT balance FROM accounts WHERE account_number=%s", (acc,))
-    balance = cur.fetchone()[0]
+    bal = cur.fetchone()[0]
     cur.close()
     conn.close()
 
-    return render_template("atm_balance.html", balance=balance)
+    return render_template("atm_balance.html", balance=bal)
 
 
-# ------------------- ATM LOGOUT -------------------
 @app.route("/atm/logout")
 def atm_logout():
     session.pop("atm_acc", None)
-    flash("ATM session closed.", "info")
     return redirect(url_for("atm_login"))
 
+
+# Change PIN
+@app.route("/change_pin", methods=["GET", "POST"])
+def change_pin():
+    if "acc_no" not in session:
+        return redirect(url_for("login"))
+
+    acc_no = session["acc_no"]
+
+    if request.method == "POST":
+        new_pin = request.form.get("new_pin")
+        confirm_pin = request.form.get("confirm_pin")
+
+        if new_pin != confirm_pin or not new_pin.isdigit() or len(new_pin) != 4:
+            flash("Invalid PIN.", "danger")
+            return redirect(url_for("change_pin"))
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE accounts SET pin=%s WHERE account_number=%s", (new_pin, acc_no))
+        cur.execute("INSERT INTO transactions VALUES (NULL,%s,'PIN_CHANGE',0,'PIN Changed',NULL)", (acc_no,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash("PIN changed successfully!", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("change_pin.html")
+
+
+@app.route("/forgot", methods=["GET", "POST"])
+def forgot():
+    if request.method == "POST":
+        phone = request.form.get("phone")
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT account_number FROM accounts WHERE phone=%s", (phone,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row:
+            flash(f"Your Account Number is: {row[0]}", "success")
+        else:
+            flash("No account found with this phone.", "danger")
+
+    return render_template("forgot.html")
 
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
-
